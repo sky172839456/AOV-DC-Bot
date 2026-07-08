@@ -11,43 +11,53 @@ HEADERS = {
     "User-Agent": "Mozilla/5.0"
 }
 
-
-@retry()
-def fetch_latest_news():
+def fetch_page(page):
     """
-    抓取 AOV 官方所有公告
+    抓取指定頁數
     """
 
-    fetch("連線 Garena 官方網站")
+    if page == 1:
+        url = AOV_NEWS_URL
+    else:
+        url = f"{AOV_NEWS_URL}?page={page}"
+
+    fetch(f"連線 Garena 第 {page} 頁")
 
     response = requests.get(
-        AOV_NEWS_URL,
+        url,
         headers=HEADERS,
         timeout=15
     )
 
     response.raise_for_status()
 
+    return response.text
+
+def parse_events(html):
+    """
+    解析單一頁公告
+    """
+
     soup = BeautifulSoup(
-        response.text,
+        html,
         "lxml"
     )
 
     news_list = []
 
-    events = soup.select("div.event")
-
     current_year = datetime.now().year
+
+    events = soup.select("div.event")
 
     for index, event in enumerate(events):
 
-        title_tag = event.select_one(".event_title")
+        title_tag = event.select_one(".event_list_title")
         if title_tag is None:
             continue
 
         title = title_tag.get_text(strip=True)
 
-        date_tag = event.select_one(".event_date")
+        date_tag = event.select_one(".event_list_date")
         if date_tag is None:
             continue
 
@@ -71,11 +81,8 @@ def fetch_latest_news():
         href = link.get("href", "")
 
         if href.startswith("/"):
-
             url = "https://moba.garena.tw" + href
-
         else:
-
             url = href
 
         news_id = url.rstrip("/").split("/")[-1]
@@ -117,6 +124,40 @@ def fetch_latest_news():
             "order": index
 
         })
+
+    return news_list
+
+@retry()
+def fetch_latest_news():
+    """
+    抓取 AOV 官方所有公告
+    """
+    raise Exception("我是新的 fetch_latest_news()")
+    fetch("連線 Garena 官方網站")
+
+    news_list = []
+
+    for page in [1, 2]:
+
+        print("=" * 40)
+        print(f"DEBUG：開始抓第 {page} 頁")
+
+        html = fetch_page(page)
+
+        print(f"DEBUG：第 {page} 頁抓取完成")
+
+        if page == 1:
+            with open("garena.html", "w", encoding="utf-8") as f:
+                f.write(html)
+
+        count = len(parse_events(html))
+        print(f"DEBUG：第 {page} 頁解析到 {count} 則公告")
+
+        news_list.extend(
+            parse_events(html)
+        )
+
+        print(f"DEBUG：目前總共 {len(news_list)} 則公告")
 
     news_list.sort(
         key=lambda x: (
