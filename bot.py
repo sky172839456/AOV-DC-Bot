@@ -1,6 +1,10 @@
 import sys
 
-from config import WEBHOOK_URL
+from config import (
+    WEBHOOK_URL,
+    TEST_WEBHOOK_URL
+)
+
 from sources.aov_news import fetch_latest_news
 
 from core.storage import (
@@ -22,7 +26,16 @@ from core.logger import (
 
 def main():
 
+    # -----------------------------
+    # Command Line Arguments
+    # -----------------------------
+
     force_mode = "--force" in sys.argv
+    test_mode = "--test" in sys.argv
+
+    # -----------------------------
+    # Banner
+    # -----------------------------
 
     banner()
 
@@ -30,6 +43,13 @@ def main():
 
     if force_mode:
         warning("Force Mode：ON（忽略 latest.txt）")
+
+    if test_mode:
+        warning("Test Mode：使用測試 Webhook")
+
+    # -----------------------------
+    # Fetch News
+    # -----------------------------
 
     news_list = fetch_latest_news()
 
@@ -45,7 +65,7 @@ def main():
 
     if force_mode:
 
-        # 只送最新一篇
+        # Force Mode：只送最新一篇
         new_news.append(news_list[0])
 
     else:
@@ -65,30 +85,44 @@ def main():
 
     info(f"共有 {len(new_news)} 則新公告")
 
-    if not WEBHOOK_URL:
+    # -----------------------------
+    # Select Webhook
+    # -----------------------------
 
-        warning("未設定 WEBHOOK_URL")
+    webhook_url = TEST_WEBHOOK_URL if test_mode else WEBHOOK_URL
+
+    if not webhook_url:
+
+        warning("未設定 Webhook")
         warning("已跳過 Discord 發送（開發模式）")
 
         done("Finished")
         return
+
+    # -----------------------------
+    # Send Discord
+    # -----------------------------
 
     success_count = 0
 
     for news in reversed(new_news):
 
         if send_discord(
-            WEBHOOK_URL,
+            webhook_url,
             news
         ):
             success_count += 1
+
+    # -----------------------------
+    # Save latest.txt
+    # -----------------------------
 
     if not force_mode:
 
         save("更新 latest.txt")
         save_latest_id(news_list[0]["id"])
 
-        success("全部公告發送完成")
+        success(f"全部公告發送完成（{success_count}/{len(new_news)}）")
 
     else:
 
