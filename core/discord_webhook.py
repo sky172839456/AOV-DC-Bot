@@ -42,10 +42,15 @@ def send_discord(webhook_url, news):
         "timestamp": datetime.utcnow().isoformat()
     }
 
+    # -----------------------
+    # Image
+    # -----------------------
+
     image = news.get("image")
 
     if (
         image
+        and isinstance(image, str)
         and image.startswith("http")
         and image.lower() != "none"
     ):
@@ -59,17 +64,42 @@ def send_discord(webhook_url, news):
 
     send(f"Discord：{news['title']}")
 
-    response = requests.post(
-        webhook_url,
-        json=payload,
-        timeout=20
-    )
+    try:
 
-    if response.status_code >= 400:
+        response = requests.post(
+            webhook_url,
+            json=payload,
+            timeout=20
+        )
 
-        error(f"Discord Status：{response.status_code}")
-        error(response.text)
+        if response.status_code >= 400:
 
-    response.raise_for_status()
+            print()
+            print("=" * 60)
+            error("Discord 回傳錯誤")
+            error(f"Status : {response.status_code}")
+            error(response.text)
 
-    success("Discord 發送成功")
+            print()
+            print("========== Payload ==========")
+            print(payload)
+            print("=============================")
+            print()
+
+        response.raise_for_status()
+
+        success("Discord 發送成功")
+
+        return True
+
+    except requests.exceptions.RequestException as e:
+
+        print()
+        print("=" * 60)
+        error("Discord Webhook 發送失敗")
+        error(str(e))
+        print("=" * 60)
+        print()
+
+        # 不讓整個 BOT 中止
+        return False
