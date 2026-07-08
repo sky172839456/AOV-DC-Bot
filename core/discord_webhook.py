@@ -1,8 +1,9 @@
 import requests
-from datetime import datetime
 
 from core.retry import retry
 from core.logger import send, success, error
+
+from embeds.embed_builder import build_embed
 
 
 @retry(
@@ -14,52 +15,24 @@ def send_discord(webhook_url, news):
     發送 Discord Webhook
     """
 
-    embed = {
-        "title": "📢 傳說對決｜最新公告",
-        "description": f"## 📌 {news['title']}",
-        "url": news["url"],
-        "color": 0x3498DB,
-        "fields": [
-            {
-                "name": "🏷️ 類別",
-                "value": news.get("category", "公告"),
-                "inline": True
-            },
-            {
-                "name": "📅 日期",
-                "value": news.get("date", "-"),
-                "inline": True
-            },
-            {
-                "name": "🔗 官方公告",
-                "value": f"[點我前往公告]({news['url']})",
-                "inline": False
-            }
-        ],
-        "footer": {
-            "text": "🤖 AOV Discord BOT v2.5"
-        },
-        "timestamp": datetime.utcnow().isoformat()
-    }
-
-    # -----------------------
-    # Image
-    # -----------------------
-
-    image = news.get("image")
-
-    if (
-        image
-        and isinstance(image, str)
-        and image.startswith("http")
-        and image.lower() != "none"
-    ):
-        embed["image"] = {
-            "url": image
-        }
+    embed = build_embed(news)
 
     payload = {
-        "embeds": [embed]
+        "embeds": [embed],
+
+        "components": [
+            {
+                "type": 1,
+                "components": [
+                    {
+                        "type": 2,
+                        "style": 5,
+                        "label": "📖 官方公告",
+                        "url": news["url"]
+                    }
+                ]
+            }
+        ]
     }
 
     send(f"Discord：{news['title']}")
@@ -76,6 +49,7 @@ def send_discord(webhook_url, news):
 
             print()
             print("=" * 60)
+
             error("Discord 回傳錯誤")
             error(f"Status : {response.status_code}")
             error(response.text)
@@ -96,10 +70,10 @@ def send_discord(webhook_url, news):
 
         print()
         print("=" * 60)
+
         error("Discord Webhook 發送失敗")
         error(str(e))
         print("=" * 60)
         print()
 
-        # 不讓整個 BOT 中止
         return False

@@ -1,36 +1,41 @@
+import sys
+
 from config import WEBHOOK_URL
 from sources.aov_news import fetch_latest_news
-from core.storage import load_latest_id, save_latest_id
+
+from core.storage import (
+    load_latest_id,
+    save_latest_id
+)
+
 from core.discord_webhook import send_discord
 
 from core.logger import (
     banner,
     info,
-    fetch,
-    send,
-    save,
-    success,
     warning,
+    success,
+    save,
     done
 )
 
 
 def main():
 
+    force_mode = "--force" in sys.argv
+
     banner()
 
     info("BOT 啟動")
 
-    fetch("開始抓取 Garena 官方公告...")
+    if force_mode:
+        warning("Force Mode：ON（忽略 latest.txt）")
 
     news_list = fetch_latest_news()
 
     if not news_list:
         warning("找不到任何公告")
-        done()
         return
-
-    success(f"成功取得 {len(news_list)} 則公告")
 
     latest_id = load_latest_id()
 
@@ -38,57 +43,58 @@ def main():
 
     new_news = []
 
-    for news in news_list:
+    if force_mode:
 
-        if news["id"] == latest_id:
-            break
+        # 只送最新一篇
+        new_news.append(news_list[0])
 
-        new_news.append(news)
+    else:
+
+        for news in news_list:
+
+            if news["id"] == latest_id:
+                break
+
+            new_news.append(news)
 
     if not new_news:
+
         info("沒有新公告")
-        done()
+        done("Finished")
         return
 
     info(f"共有 {len(new_news)} 則新公告")
-
-    # ============================
-    # 開發模式（本機沒有 Webhook）
-    # ============================
 
     if not WEBHOOK_URL:
 
         warning("未設定 WEBHOOK_URL")
         warning("已跳過 Discord 發送（開發模式）")
 
-        done()
-
+        done("Finished")
         return
 
-    # ============================
-    # 正式發送
-    # ============================
+    success_count = 0
 
     for news in reversed(new_news):
 
-        print()
-
-        send(f"Discord：{news['title']}")
-
-        send_discord(
+        if send_discord(
             WEBHOOK_URL,
             news
-        )
+        ):
+            success_count += 1
 
-    save("更新 latest.txt")
+    if not force_mode:
 
-    save_latest_id(
-        news_list[0]["id"]
-    )
+        save("更新 latest.txt")
+        save_latest_id(news_list[0]["id"])
 
-    success("全部公告發送完成")
+        success("全部公告發送完成")
 
-    done()
+    else:
+
+        info("Force Mode：不更新 latest.txt")
+
+    done("Finished")
 
 
 if __name__ == "__main__":

@@ -1,4 +1,8 @@
 import os
+from dotenv import load_dotenv
+
+# 載入 .env
+load_dotenv()
 
 # Discord Webhook
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")
