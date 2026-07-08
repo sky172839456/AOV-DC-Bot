@@ -51,20 +51,21 @@ jobs:
 
           if git diff --quiet -- latest.txt; then
             echo "latest.txt 沒有變更"
-          else
-            git add latest.txt
-            git commit -m "Update latest news id"
-
-            for attempt in 1 2 3; do
-              if git push origin HEAD:main; then
-                exit 0
-              fi
-
-              echo "Push failed, rebasing with origin/main then retrying... ($attempt/3)"
-              git pull --rebase --autostash origin main
-              sleep 2
-            done
-
-            echo "Failed to push latest.txt after 3 attempts"
-            exit 1
+            exit 0
           fi
+
+          latest_id="$(cat latest.txt)"
+          echo "latest.txt will be updated to: ${latest_id}"
+
+          git fetch origin main
+          git reset --hard origin/main
+          printf "%s" "${latest_id}" > latest.txt
+
+          if git diff --quiet -- latest.txt; then
+            echo "遠端 latest.txt 已經是最新"
+            exit 0
+          fi
+
+          git add latest.txt
+          git commit -m "Update latest news id"
+          git push origin HEAD:main
