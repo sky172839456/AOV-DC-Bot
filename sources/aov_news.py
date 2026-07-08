@@ -11,9 +11,10 @@ HEADERS = {
     "User-Agent": "Mozilla/5.0"
 }
 
-def fetch_page(page):
+
+def fetch_page(page: int) -> str:
     """
-    抓取指定頁數
+    抓取指定頁面的 HTML
     """
 
     if page == 1:
@@ -33,7 +34,8 @@ def fetch_page(page):
 
     return response.text
 
-def parse_events(html):
+
+def parse_events(html: str):
     """
     解析單一頁公告
     """
@@ -43,23 +45,28 @@ def parse_events(html):
         "lxml"
     )
 
-    news_list = []
+    events = soup.select("div.event")
+   
 
     current_year = datetime.now().year
 
-    events = soup.select("div.event")
+    news_list = []
 
     for index, event in enumerate(events):
 
         title_tag = event.select_one(".event_list_title")
-        if title_tag is None:
+        if not title_tag:
+            continue
+
+        date_tag = event.select_one(".event_list_date")
+        if not date_tag:
+            continue
+
+        link_tag = event.select_one("a")
+        if not link_tag:
             continue
 
         title = title_tag.get_text(strip=True)
-
-        date_tag = event.select_one(".event_list_date")
-        if date_tag is None:
-            continue
 
         date_text = date_tag.get_text(strip=True)
 
@@ -73,12 +80,7 @@ def parse_events(html):
         except Exception:
             continue
 
-        link = event.select_one("a")
-
-        if link is None:
-            continue
-
-        href = link.get("href", "")
+        href = link_tag.get("href", "")
 
         if href.startswith("/"):
             url = "https://moba.garena.tw" + href
@@ -124,41 +126,39 @@ def parse_events(html):
             "order": index
 
         })
+    
 
     return news_list
+
 
 @retry()
 def fetch_latest_news():
     """
     抓取 AOV 官方所有公告
     """
-    raise Exception("我是新的 fetch_latest_news()")
+
     fetch("連線 Garena 官方網站")
 
     news_list = []
 
+    # 目前先抓前兩頁
+    # v2.6 完成後會改成自動抓到最後一頁
     for page in [1, 2]:
-
-        print("=" * 40)
-        print(f"DEBUG：開始抓第 {page} 頁")
 
         html = fetch_page(page)
 
-        print(f"DEBUG：第 {page} 頁抓取完成")
-
+        # 保留第一頁 HTML 方便除錯
         if page == 1:
-            with open("garena.html", "w", encoding="utf-8") as f:
+            with open(
+                "garena.html",
+                "w",
+                encoding="utf-8"
+            ) as f:
                 f.write(html)
 
-        count = len(parse_events(html))
-        print(f"DEBUG：第 {page} 頁解析到 {count} 則公告")
+        page_news = parse_events(html)
 
-        news_list.extend(
-            parse_events(html)
-        )
-
-        print(f"DEBUG：目前總共 {len(news_list)} 則公告")
-
+        news_list.extend(page_news)
     news_list.sort(
         key=lambda x: (
             x["datetime"],

@@ -14,10 +14,7 @@ from core.storage import (
 
 from core.discord_webhook import send_discord
 
-# ===== DEBUG =====
-import sources.aov_news
-print("目前載入檔案：", sources.aov_news.__file__)
-# ================
+
 
 
 from core.logger import (
