@@ -10,8 +10,10 @@ HEADERS = {
 
 def fetch_latest_news():
     """
-    抓取 AOV 官方最新公告
+    抓取 AOV 官方所有公告
+
     回傳:
+    [
         {
             id,
             title,
@@ -21,6 +23,7 @@ def fetch_latest_news():
             image,
             category
         }
+    ]
     """
 
     response = requests.get(
@@ -35,30 +38,19 @@ def fetch_latest_news():
 
     news_list = []
 
-    # 取得所有公告
     events = soup.select("div.event")
 
     current_year = datetime.now().year
 
-    for event in events:
-
-        # =====================
-        # 標題
-        # =====================
+    for index, event in enumerate(events):
 
         title_tag = event.select_one(".event_title")
-
         if title_tag is None:
             continue
 
         title = title_tag.get_text(strip=True)
 
-        # =====================
-        # 日期
-        # =====================
-
         date_tag = event.select_one(".event_date")
-
         if date_tag is None:
             continue
 
@@ -69,15 +61,10 @@ def fetch_latest_news():
                 f"{current_year}/{date_text}",
                 "%Y/%m/%d"
             )
-        except:
+        except Exception:
             continue
 
-        # =====================
-        # 連結
-        # =====================
-
         link = event.select_one("a")
-
         if link is None:
             continue
 
@@ -88,35 +75,22 @@ def fetch_latest_news():
         else:
             url = href
 
-        # =====================
-        # ID
-        # =====================
-
         news_id = url.rstrip("/").split("/")[-1]
 
-        # =====================
-        # 圖片
-        # =====================
-
         image = None
-
         img = event.select_one("img")
 
         if img:
             image = img.get("src")
 
-        # =====================
-        # 類別
-        # =====================
+            if image and image.startswith("/"):
+                image = "https://moba.garena.tw" + image
 
         category = "公告"
 
         icon = event.select_one(".event_list_icon")
-
         if icon:
             category = icon.get_text(strip=True)
-
-        # =====================
 
         news_list.append({
 
@@ -132,20 +106,15 @@ def fetch_latest_news():
 
             "image": image,
 
-            "category": category
+            "category": category,
+
+            "order": index
 
         })
 
-    # =====================
-    # 排序
-    # =====================
-
     news_list.sort(
-        key=lambda x: x["datetime"],
+        key=lambda x: (x["datetime"], -x["order"]),
         reverse=True
     )
 
-    if not news_list:
-        return None
-
-    return news_list[0]
+    return news_list
