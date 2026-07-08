@@ -22,8 +22,6 @@ def build_embed(news):
         f"{news.get('date', '-')}\n\n"
         f"🏷️ **類別**\n"
         f"{news.get('category', '公告')}\n\n"
-        "💡 **AI 摘要（V3）**\n"
-        "🚧 尚未啟用\n\n"
         "━━━━━━━━━━━━━━━━━━━━━━\n\n"
         f"🔗 **[官方公告]({news['url']})**"
     )

@@ -50,6 +50,19 @@ def should_save_debug_html():
     }
 
 
+def fetch_url(url: str) -> str:
+    response = requests.get(
+        url,
+        headers=HEADERS,
+        timeout=15
+    )
+
+    response.raise_for_status()
+    response.encoding = "utf-8"
+
+    return response.text
+
+
 def fetch_page(page: int) -> str:
     """
     抓取指定頁面的 HTML
@@ -62,16 +75,7 @@ def fetch_page(page: int) -> str:
 
     fetch(f"連線 Garena 第 {page} 頁")
 
-    response = requests.get(
-        url,
-        headers=HEADERS,
-        timeout=15
-    )
-
-    response.raise_for_status()
-    response.encoding = "utf-8"
-
-    return response.text
+    return fetch_url(url)
 
 
 def parse_news_date(date_text: str):
@@ -90,6 +94,84 @@ def parse_news_date(date_text: str):
         parsed = parsed.replace(year=now.year - 1)
 
     return parsed
+
+
+def normalize_image_url(image_src):
+    if not image_src:
+        return None
+
+    image = urljoin(BASE_URL, image_src)
+
+    if not image.startswith("http"):
+        return None
+
+    return image
+
+
+def find_list_image(event):
+    img = event.select_one("img")
+
+    if not img:
+        return None
+
+    return normalize_image_url(
+        img.get("src")
+        or img.get("data-src")
+        or img.get("data-original")
+    )
+
+
+def parse_detail_image(html: str, page_url: str):
+    """
+    從公告內頁抓圖片。優先使用社群分享圖 og:image。
+    """
+
+    soup = BeautifulSoup(
+        html,
+        "lxml"
+    )
+
+    selectors = [
+        "meta[property='og:image']",
+        "meta[name='twitter:image']"
+    ]
+
+    for selector in selectors:
+        meta = soup.select_one(selector)
+        image = normalize_image_url(meta.get("content") if meta else None)
+
+        if image:
+            return image
+
+    img = soup.select_one("article img, .news_content img, .content img, img")
+
+    if not img:
+        return None
+
+    image_src = (
+        img.get("src")
+        or img.get("data-src")
+        or img.get("data-original")
+    )
+
+    if not image_src:
+        return None
+
+    return urljoin(page_url, image_src)
+
+
+def fetch_detail_image(news):
+    """
+    列表沒有圖片時，進公告內頁補抓圖片。
+    """
+
+    try:
+        fetch(f"抓取公告圖片：{news['id']}")
+        html = fetch_url(news["url"])
+        return parse_detail_image(html, news["url"])
+    except requests.RequestException as exc:
+        warning(f"公告圖片抓取失敗：{news['id']} → {exc}")
+        return None
 
 
 def parse_events(html: str):
@@ -137,15 +219,6 @@ def parse_events(html: str):
             warning(f"略過缺少公告 ID 的公告：{title}")
             continue
 
-        image = None
-        img = event.select_one("img")
-
-        if img:
-            image_src = img.get("src")
-
-            if image_src:
-                image = urljoin(BASE_URL, image_src)
-
         category = "公告"
         icon = event.select_one(".event_list_icon")
 
@@ -158,10 +231,20 @@ def parse_events(html: str):
             "date": date_text,
             "datetime": dt,
             "url": url,
-            "image": image,
+            "image": find_list_image(event),
             "category": category,
             "order": index
         })
+
+    return news_list
+
+
+def fill_missing_images(news_list):
+    for news in news_list:
+        if news.get("image"):
+            continue
+
+        news["image"] = fetch_detail_image(news)
 
     return news_list
 

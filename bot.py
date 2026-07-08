@@ -5,7 +5,7 @@ from config import (
     TEST_WEBHOOK_URL
 )
 
-from sources.aov_news import fetch_latest_news
+from sources.aov_news import (fetch_latest_news, fill_missing_images)
 
 from core.storage import (
     load_latest_id,
@@ -117,6 +117,8 @@ def main():
         return 0
 
     info(f"共有 {len(new_news)} 則新公告")
+
+    fill_missing_images(new_news)
 
     # -----------------------------
     # Select Webhook
