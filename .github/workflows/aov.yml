@@ -52,8 +52,19 @@ jobs:
           if git diff --quiet -- latest.txt; then
             echo "latest.txt 沒有變更"
           else
-            git pull --rebase --autostash
             git add latest.txt
             git commit -m "Update latest news id"
-            git push
+
+            for attempt in 1 2 3; do
+              if git push origin HEAD:main; then
+                exit 0
+              fi
+
+              echo "Push failed, rebasing with origin/main then retrying... ($attempt/3)"
+              git pull --rebase --autostash origin main
+              sleep 2
+            done
+
+            echo "Failed to push latest.txt after 3 attempts"
+            exit 1
           fi
