@@ -1,25 +1,56 @@
+"""
+AOV Discord BOT
+Logger System
+"""
+
 from datetime import datetime
+from core.version import BOT_NAME, VERSION
 
 
-def _now():
+def _time():
     return datetime.now().strftime("%H:%M:%S")
 
 
-def line():
-    print("=" * 60)
+def _log(level: str, message: str):
+    print(f"[{_time()}] [{level:<7}] {message}")
+
+
+def banner():
+    print()
+    print("═" * 60)
+    print(f"🤖 {BOT_NAME}")
+    print(f"📦 Version : {VERSION}")
+    print("═" * 60)
+    print()
 
 
 def info(message):
-    print(f"[{_now()}] [INFO] {message}")
+    _log("INFO", message)
+
+
+def fetch(message):
+    _log("FETCH", message)
+
+
+def send(message):
+    _log("SEND", message)
+
+
+def save(message):
+    _log("SAVE", message)
 
 
 def success(message):
-    print(f"[{_now()}] [ OK ] {message}")
+    _log("SUCCESS", message)
 
 
 def warning(message):
-    print(f"[{_now()}] [WARN] {message}")
+    _log("WARNING", message)
 
 
 def error(message):
-    print(f"[{_now()}] [ERROR] {message}")
+    _log("ERROR", message)
+
+
+def done(message="Finished"):
+    _log("DONE", message)

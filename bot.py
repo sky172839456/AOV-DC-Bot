@@ -3,26 +3,41 @@ from sources.aov_news import fetch_latest_news
 from core.storage import load_latest_id, save_latest_id
 from core.discord_webhook import send_discord
 
+from core.logger import (
+    banner,
+    info,
+    fetch,
+    send,
+    save,
+    success,
+    warning,
+    done
+)
+
 
 def main():
 
-    print("=" * 50)
-    print("AOV Discord Bot")
-    print("=" * 50)
+    banner()
+
+    info("BOT 啟動")
+
+    fetch("開始抓取 Garena 官方公告...")
 
     news_list = fetch_latest_news()
 
     if not news_list:
-        print("找不到任何公告")
+        warning("找不到任何公告")
+        done()
         return
+
+    success(f"成功取得 {len(news_list)} 則公告")
 
     latest_id = load_latest_id()
 
-    print(f"目前紀錄：{latest_id}")
+    info(f"目前 latest.txt：{latest_id}")
 
     new_news = []
 
-    # 找出所有尚未通知的公告
     for news in news_list:
 
         if news["id"] == latest_id:
@@ -31,32 +46,49 @@ def main():
         new_news.append(news)
 
     if not new_news:
-        print("沒有新公告")
+        info("沒有新公告")
+        done()
         return
 
+    info(f"共有 {len(new_news)} 則新公告")
+
+    # ============================
+    # 開發模式（本機沒有 Webhook）
+    # ============================
+
     if not WEBHOOK_URL:
-        raise Exception("WEBHOOK_URL 尚未設定")
 
-    print(f"共有 {len(new_news)} 篇新公告")
+        warning("未設定 WEBHOOK_URL")
+        warning("已跳過 Discord 發送（開發模式）")
 
-    # 依照發布順序（舊 → 新）發送
+        done()
+
+        return
+
+    # ============================
+    # 正式發送
+    # ============================
+
     for news in reversed(new_news):
 
-        print("-" * 50)
-        print(f"發送：{news['title']}")
-        print(news["date"])
-        print(news["url"])
+        print()
+
+        send(f"Discord：{news['title']}")
 
         send_discord(
             WEBHOOK_URL,
             news
         )
 
-    # 更新最新公告 ID
-    save_latest_id(news_list[0]["id"])
+    save("更新 latest.txt")
 
-    print("-" * 50)
-    print("全部公告發送完成！")
+    save_latest_id(
+        news_list[0]["id"]
+    )
+
+    success("全部公告發送完成")
+
+    done()
 
 
 if __name__ == "__main__":

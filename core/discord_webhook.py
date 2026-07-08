@@ -1,7 +1,14 @@
 import requests
 from datetime import datetime
 
+from core.retry import retry
+from core.logger import send, success, error
 
+
+@retry(
+    retries=3,
+    delay=2
+)
 def send_discord(webhook_url, news):
     """
     發送 Discord Webhook
@@ -30,12 +37,11 @@ def send_discord(webhook_url, news):
             }
         ],
         "footer": {
-            "text": "🤖 AOV Discord Bot｜自動同步 Garena 官方公告"
+            "text": "🤖 AOV Discord BOT v2.5"
         },
         "timestamp": datetime.utcnow().isoformat()
     }
 
-    # ---------- 圖片 ----------
     image = news.get("image")
 
     if (
@@ -51,33 +57,19 @@ def send_discord(webhook_url, news):
         "embeds": [embed]
     }
 
-    print("📤 Discord 發送中...")
+    send(f"Discord：{news['title']}")
 
-    try:
+    response = requests.post(
+        webhook_url,
+        json=payload,
+        timeout=20
+    )
 
-        response = requests.post(
-            webhook_url,
-            json=payload,
-            timeout=20
-        )
+    if response.status_code >= 400:
 
-        if response.status_code >= 400:
+        error(f"Discord Status：{response.status_code}")
+        error(response.text)
 
-            print("=" * 60)
-            print("❌ Discord 回傳錯誤")
-            print("Status :", response.status_code)
-            print(response.text)
-            print("=" * 60)
+    response.raise_for_status()
 
-        response.raise_for_status()
-
-        print("✅ Discord 發送成功")
-
-    except requests.exceptions.RequestException as e:
-
-        print("=" * 60)
-        print("❌ Discord Webhook 發送失敗")
-        print(e)
-        print("=" * 60)
-
-        raise
+    success("Discord 發送成功")
