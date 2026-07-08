@@ -1,15 +1,53 @@
+import os
+from datetime import datetime, timedelta
+from urllib.parse import urljoin
+
 import requests
 from bs4 import BeautifulSoup
-from datetime import datetime
 
 from config import AOV_NEWS_URL
 from core.retry import retry
-from core.logger import fetch, success
+from core.logger import fetch, info, success, warning
 
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0"
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/126.0 Safari/537.36"
+    )
 }
+
+BASE_URL = "https://moba.garena.tw"
+DEFAULT_MAX_PAGES = 8
+
+
+def get_max_pages():
+    """
+    可用 AOV_MAX_PAGES 調整最多抓幾頁，預設 8 頁。
+    """
+
+    raw_value = os.getenv("AOV_MAX_PAGES")
+
+    if not raw_value:
+        return DEFAULT_MAX_PAGES
+
+    try:
+        max_pages = int(raw_value)
+    except ValueError:
+        warning(f"AOV_MAX_PAGES 不是有效數字，使用預設 {DEFAULT_MAX_PAGES}")
+        return DEFAULT_MAX_PAGES
+
+    return max(1, max_pages)
+
+
+def should_save_debug_html():
+    return os.getenv("SAVE_GARENA_HTML", "").lower() in {
+        "1",
+        "true",
+        "yes",
+        "on"
+    }
 
 
 def fetch_page(page: int) -> str:
@@ -31,8 +69,27 @@ def fetch_page(page: int) -> str:
     )
 
     response.raise_for_status()
+    response.encoding = "utf-8"
 
     return response.text
+
+
+def parse_news_date(date_text: str):
+    """
+    官網列表只提供月/日，跨年時避免把去年 12 月公告解析成未來日期。
+    """
+
+    now = datetime.now()
+
+    parsed = datetime.strptime(
+        f"{now.year}/{date_text}",
+        "%Y/%m/%d"
+    )
+
+    if parsed > now + timedelta(days=1):
+        parsed = parsed.replace(year=now.year - 1)
+
+    return parsed
 
 
 def parse_events(html: str):
@@ -46,9 +103,6 @@ def parse_events(html: str):
     )
 
     events = soup.select("div.event")
-   
-
-    current_year = datetime.now().year
 
     news_list = []
 
@@ -67,66 +121,47 @@ def parse_events(html: str):
             continue
 
         title = title_tag.get_text(strip=True)
-
         date_text = date_tag.get_text(strip=True)
 
         try:
-
-            dt = datetime.strptime(
-                f"{current_year}/{date_text}",
-                "%Y/%m/%d"
-            )
-
-        except Exception:
+            dt = parse_news_date(date_text)
+        except ValueError:
+            warning(f"略過無法解析日期的公告：{date_text} / {title}")
             continue
 
         href = link_tag.get("href", "")
-
-        if href.startswith("/"):
-            url = "https://moba.garena.tw" + href
-        else:
-            url = href
-
+        url = urljoin(BASE_URL, href)
         news_id = url.rstrip("/").split("/")[-1]
 
-        image = None
+        if not news_id:
+            warning(f"略過缺少公告 ID 的公告：{title}")
+            continue
 
+        image = None
         img = event.select_one("img")
 
         if img:
+            image_src = img.get("src")
 
-            image = img.get("src")
-
-            if image and image.startswith("/"):
-                image = "https://moba.garena.tw" + image
+            if image_src:
+                image = urljoin(BASE_URL, image_src)
 
         category = "公告"
-
         icon = event.select_one(".event_list_icon")
 
         if icon:
-            category = icon.get_text(strip=True)
+            category = icon.get_text(strip=True) or category
 
         news_list.append({
-
             "id": news_id,
-
             "title": title,
-
             "date": date_text,
-
             "datetime": dt,
-
             "url": url,
-
             "image": image,
-
             "category": category,
-
             "order": index
-
         })
-    
 
     return news_list
 
@@ -134,21 +169,20 @@ def parse_events(html: str):
 @retry()
 def fetch_latest_news():
     """
-    抓取 AOV 官方所有公告
+    抓取 AOV 官方公告
     """
 
     fetch("連線 Garena 官方網站")
 
     news_list = []
+    seen_ids = set()
+    max_pages = get_max_pages()
 
-    # 目前先抓前兩頁
-    # v2.6 完成後會改成自動抓到最後一頁
-    for page in [1, 2]:
-
+    for page in range(1, max_pages + 1):
         html = fetch_page(page)
+        info(f"Garena 第 {page} 頁 HTML 長度：{len(html)}")
 
-        # 保留第一頁 HTML 方便除錯
-        if page == 1:
+        if page == 1 and should_save_debug_html():
             with open(
                 "garena.html",
                 "w",
@@ -158,7 +192,22 @@ def fetch_latest_news():
 
         page_news = parse_events(html)
 
-        news_list.extend(page_news)
+        if not page_news:
+            warning(f"第 {page} 頁沒有解析到公告，停止抓取")
+            break
+
+        added_count = 0
+
+        for news in page_news:
+            if news["id"] in seen_ids:
+                continue
+
+            seen_ids.add(news["id"])
+            news_list.append(news)
+            added_count += 1
+
+        info(f"第 {page} 頁新增 {added_count} 則公告")
+
     news_list.sort(
         key=lambda x: (
             x["datetime"],
