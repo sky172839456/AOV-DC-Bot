@@ -20,6 +20,10 @@ HEADERS = {
 
 BASE_URL = "https://moba.garena.tw"
 DEFAULT_MAX_PAGES = 8
+NEWS_SOURCES = (
+    ("公告", AOV_NEWS_URL),
+    ("活動", urljoin(AOV_NEWS_URL, "Activity")),
+)
 
 
 def get_max_pages():
@@ -63,15 +67,15 @@ def fetch_url(url: str) -> str:
     return response.text
 
 
-def fetch_page(page: int) -> str:
+def fetch_page(base_url: str, page: int) -> str:
     """
     抓取指定頁面的 HTML
     """
 
     if page == 1:
-        url = AOV_NEWS_URL
+        url = base_url
     else:
-        url = f"{AOV_NEWS_URL}?page={page}"
+        url = f"{base_url}?page={page}"
 
     fetch(f"連線 Garena 第 {page} 頁")
 
@@ -174,7 +178,7 @@ def fetch_detail_image(news):
         return None
 
 
-def parse_events(html: str):
+def parse_events(html: str, default_category="公告"):
     """
     解析單一頁公告
     """
@@ -219,7 +223,7 @@ def parse_events(html: str):
             warning(f"略過缺少公告 ID 的公告：{title}")
             continue
 
-        category = "公告"
+        category = default_category
         icon = event.select_one(".event_list_icon")
 
         if icon:
@@ -261,35 +265,36 @@ def fetch_latest_news():
     seen_ids = set()
     max_pages = get_max_pages()
 
-    for page in range(1, max_pages + 1):
-        html = fetch_page(page)
-        info(f"Garena 第 {page} 頁 HTML 長度：{len(html)}")
+    for source_category, source_url in NEWS_SOURCES:
+        for page in range(1, max_pages + 1):
+            html = fetch_page(source_url, page)
+            info(f"Garena {source_category}第 {page} 頁 HTML 長度：{len(html)}")
 
-        if page == 1 and should_save_debug_html():
-            with open(
-                "garena.html",
-                "w",
-                encoding="utf-8"
-            ) as f:
-                f.write(html)
+            if source_category == "公告" and page == 1 and should_save_debug_html():
+                with open(
+                    "garena.html",
+                    "w",
+                    encoding="utf-8"
+                ) as f:
+                    f.write(html)
 
-        page_news = parse_events(html)
+            page_news = parse_events(html, default_category=source_category)
 
-        if not page_news:
-            warning(f"第 {page} 頁沒有解析到公告，停止抓取")
-            break
+            if not page_news:
+                warning(f"{source_category}第 {page} 頁沒有解析到內容，停止抓取")
+                break
 
-        added_count = 0
+            added_count = 0
 
-        for news in page_news:
-            if news["id"] in seen_ids:
-                continue
+            for news in page_news:
+                if news["id"] in seen_ids:
+                    continue
 
-            seen_ids.add(news["id"])
-            news_list.append(news)
-            added_count += 1
+                seen_ids.add(news["id"])
+                news_list.append(news)
+                added_count += 1
 
-        info(f"第 {page} 頁新增 {added_count} 則公告")
+            info(f"{source_category}第 {page} 頁新增 {added_count} 則內容")
 
     news_list.sort(
         key=lambda x: (

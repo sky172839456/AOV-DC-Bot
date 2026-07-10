@@ -49,23 +49,25 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          if git diff --quiet -- latest.txt; then
-            echo "latest.txt 沒有變更"
+          if [ -z "$(git status --porcelain -- latest.txt sent_ids.txt)" ]; then
+            echo "通知紀錄沒有變更"
             exit 0
           fi
 
           latest_id="$(cat latest.txt)"
+          sent_ids="$(cat sent_ids.txt 2>/dev/null || true)"
           echo "latest.txt will be updated to: ${latest_id}"
 
           git fetch origin main
           git reset --hard origin/main
           printf "%s" "${latest_id}" > latest.txt
+          printf "%s" "${sent_ids}" > sent_ids.txt
 
-          if git diff --quiet -- latest.txt; then
-            echo "遠端 latest.txt 已經是最新"
+          if [ -z "$(git status --porcelain -- latest.txt sent_ids.txt)" ]; then
+            echo "遠端通知紀錄已經是最新"
             exit 0
           fi
 
-          git add latest.txt
-          git commit -m "Update latest news id"
+          git add latest.txt sent_ids.txt
+          git commit -m "Update sent news records"
           git push origin HEAD:main

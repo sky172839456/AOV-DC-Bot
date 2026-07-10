@@ -9,7 +9,9 @@ from sources.aov_news import (fetch_latest_news, fill_missing_images)
 
 from core.storage import (
     load_latest_id,
-    save_latest_id
+    save_latest_id,
+    load_sent_ids,
+    save_sent_ids
 )
 
 from core.discord_webhook import send_discord
@@ -24,7 +26,7 @@ from core.logger import (
 )
 
 
-def collect_new_news(news_list, latest_id, force_mode=False):
+def collect_new_news(news_list, latest_id, sent_ids=None, force_mode=False):
     """
     回傳這次需要發送的公告。
     news_list 需由新到舊排序。
@@ -34,11 +36,16 @@ def collect_new_news(news_list, latest_id, force_mode=False):
         return news_list[:1]
 
     new_news = []
+    seen_ids = set(sent_ids or ())
 
     for news in news_list:
         if news["id"] == latest_id:
             break
 
+        if news["id"] in seen_ids:
+            continue
+
+        seen_ids.add(news["id"])
         new_news.append(news)
 
     return new_news
@@ -102,12 +109,14 @@ def main():
         return 1
 
     latest_id = load_latest_id()
+    sent_ids = load_sent_ids()
 
     info(f"目前 latest.txt：{latest_id}")
 
     new_news = collect_new_news(
         news_list,
         latest_id,
+        sent_ids=sent_ids,
         force_mode=force_mode
     )
 
@@ -159,6 +168,11 @@ def main():
     if last_successful_id:
         save("更新 latest.txt")
         save_latest_id(last_successful_id)
+        successful_ids = [
+            news["id"]
+            for news in reversed(new_news)
+        ][:success_count]
+        save_sent_ids([*sent_ids, *successful_ids])
 
     if failed_news:
         warning(
