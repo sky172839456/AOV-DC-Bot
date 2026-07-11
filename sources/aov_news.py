@@ -194,15 +194,16 @@ def parse_events(html: str, default_category="公告"):
 
     for index, event in enumerate(events):
 
-        title_tag = event.select_one(".event_list_title")
+        # 官網同一頁同時有一般列表與置頂大卡片，兩者使用不同 class。
+        title_tag = event.select_one(".event_list_title, .event_title_text")
         if not title_tag:
             continue
 
-        date_tag = event.select_one(".event_list_date")
+        date_tag = event.select_one(".event_list_date, .event_date")
         if not date_tag:
             continue
 
-        link_tag = event.select_one("a")
+        link_tag = event.select_one("a[href*='/news/show/']")
         if not link_tag:
             continue
 
