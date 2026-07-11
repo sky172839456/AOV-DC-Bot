@@ -40,8 +40,13 @@ jobs:
       - name: Run Bot
         env:
           WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
+          TEST_WEBHOOK_URL: ${{ secrets.TEST_WEBHOOK_URL }}
         run: |
-          python bot.py
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            python bot.py --test-categories
+          else
+            python bot.py
+          fi
 
       - name: Commit latest.txt
         if: always()

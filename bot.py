@@ -51,6 +51,21 @@ def collect_new_news(news_list, latest_id, sent_ids=None, force_mode=False):
     return new_news
 
 
+def collect_category_samples(news_list):
+    """挑選最新一則公告與活動，供測試頻道驗證分類抓取。"""
+
+    samples = []
+    for category in ("公告", "活動"):
+        sample = next(
+            (news for news in news_list if category in news.get("category", "")),
+            None
+        )
+        if sample:
+            samples.append(sample)
+
+    return samples
+
+
 def send_news_list(webhook_url, new_news):
     """
     依時間由舊到新發送公告。
@@ -82,6 +97,10 @@ def main():
 
     force_mode = "--force" in sys.argv
     test_mode = "--test" in sys.argv
+    test_categories_mode = "--test-categories" in sys.argv
+
+    if test_categories_mode:
+        test_mode = True
 
     # -----------------------------
     # Banner
@@ -113,12 +132,21 @@ def main():
 
     info(f"目前 latest.txt：{latest_id}")
 
-    new_news = collect_new_news(
-        news_list,
-        latest_id,
-        sent_ids=sent_ids,
-        force_mode=force_mode
-    )
+    if test_categories_mode:
+        new_news = collect_category_samples(news_list)
+        found_categories = {news.get("category") for news in new_news}
+        if len(new_news) != 2:
+            warning(f"分類測試失敗，無法同時找到公告與活動：{found_categories}")
+            done("Finished")
+            return 1
+        info("分類測試：將發送最新公告與最新活動各一則")
+    else:
+        new_news = collect_new_news(
+            news_list,
+            latest_id,
+            sent_ids=sent_ids,
+            force_mode=force_mode
+        )
 
     if not new_news:
         info("沒有新公告")
@@ -152,6 +180,16 @@ def main():
     # -----------------------------
     # Save latest.txt
     # -----------------------------
+
+    if test_categories_mode:
+        info("分類測試：不更新 latest.txt 與 sent_ids.txt")
+        if failed_news:
+            warning(f"分類測試發送失敗（{success_count}/{len(new_news)}）")
+            done("Finished")
+            return 1
+        success(f"分類測試發送完成（{success_count}/{len(new_news)}）")
+        done("Finished")
+        return 0
 
     if force_mode:
         info("Force Mode：不更新 latest.txt")
