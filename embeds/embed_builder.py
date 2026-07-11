@@ -6,6 +6,8 @@ from embeds.icons import get_embed_icon
 
 BOT_NAME = "🤖 AOV 情報雷達"
 BOT_VERSION = "2.5.0"
+OFFICIAL_SITE_URL = "https://moba.garena.tw/"
+OFFICIAL_FACEBOOK_URL = "https://www.facebook.com/AoVTW/"
 
 
 def build_embed(news):
@@ -22,8 +24,10 @@ def build_embed(news):
         f"{news.get('date', '-')}\n\n"
         f"🏷️ **類別**\n"
         f"{news.get('category', '公告')}\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━\n\n"
-        f"🔗 **[官方公告]({news['url']})**"
+        f"🔗 **公告連結：** <{news['url']}>\n"
+        f"🌐 **官方網站：** <{OFFICIAL_SITE_URL}>\n"
+        f"📘 **官方 FB：** <{OFFICIAL_FACEBOOK_URL}>\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━━"
     )
 
     embed = {
@@ -31,8 +35,6 @@ def build_embed(news):
         "title": f"{icon} Garena《傳說對決》",
 
         "description": description,
-
-        "url": news["url"],
 
         # 自動顏色
         "color": get_color(news.get("category", "")),

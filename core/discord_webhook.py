@@ -18,21 +18,7 @@ def send_discord(webhook_url, news):
     embed = build_embed(news)
 
     payload = {
-        "embeds": [embed],
-
-        "components": [
-            {
-                "type": 1,
-                "components": [
-                    {
-                        "type": 2,
-                        "style": 5,
-                        "label": "📖 官方公告",
-                        "url": news["url"]
-                    }
-                ]
-            }
-        ]
+        "embeds": [embed]
     }
 
     send(f"Discord：{news['title']}")
