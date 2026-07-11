@@ -263,7 +263,7 @@ def fetch_latest_news():
     fetch("連線 Garena 官方網站")
 
     news_list = []
-    seen_ids = set()
+    news_by_id = {}
     max_pages = get_max_pages()
 
     for source_category, source_url in NEWS_SOURCES:
@@ -288,10 +288,15 @@ def fetch_latest_news():
             added_count = 0
 
             for news in page_news:
-                if news["id"] in seen_ids:
+                existing = news_by_id.get(news["id"])
+                if existing:
+                    # 同一篇可能同時出現在公告與活動頁；只保留一筆，
+                    # 但只要活動頁有收錄，就以「活動」作為分類。
+                    if source_category == "活動":
+                        existing["category"] = "活動"
                     continue
 
-                seen_ids.add(news["id"])
+                news_by_id[news["id"]] = news
                 news_list.append(news)
                 added_count += 1
 
