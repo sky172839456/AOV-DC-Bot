@@ -4,7 +4,7 @@ from embeds.colors import get_color
 from embeds.icons import get_embed_icon
 
 
-BOT_NAME = "🤖 AOV Discord BOT"
+BOT_NAME = "🤖 AOV 情報雷達"
 BOT_VERSION = "2.5.0"
 
 
