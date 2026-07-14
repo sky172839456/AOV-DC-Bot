@@ -4,7 +4,14 @@ Logger System
 """
 
 from datetime import datetime
+import sys
+
 from core.version import BOT_NAME, VERSION
+
+
+for stream in (sys.stdout, sys.stderr):
+    if hasattr(stream, "reconfigure"):
+        stream.reconfigure(errors="replace")
 
 
 def _time():
