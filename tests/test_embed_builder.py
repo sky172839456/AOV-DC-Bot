@@ -19,6 +19,17 @@ class EmbedBuilderTests(unittest.TestCase):
         self.assertIn("機器人發現時間（台灣時間）", description)
         self.assertIn("07/14 11:23", description)
 
+    def test_test_card_labels_time_as_test_execution(self):
+        news = {
+            "title": "測試公告", "date": "07/18", "category": "活動",
+            "url": "https://moba.garena.tw/news/show/1", "is_test": True,
+            "discovered_at": datetime(2026, 7, 20, 5, 15, tzinfo=timezone.utc),
+        }
+        description = build_embed(news)["description"]
+        self.assertIn("測試執行時間（台灣時間）", description)
+        self.assertNotIn("機器人發現時間（台灣時間）", description)
+        self.assertIn("07/20 13:15", description)
+
 
 if __name__ == "__main__":
     unittest.main()

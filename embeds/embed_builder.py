@@ -26,13 +26,14 @@ def build_embed(news):
     """
 
     icon = get_embed_icon(news)
+    time_label = "測試執行時間（台灣時間）" if news.get("is_test") else "機器人發現時間（台灣時間）"
 
     description = (
         "━━━━━━━━━━━━━━━━━━━━━━\n\n"
         f"# 📌 {news['title']}\n\n"
         f"📅 **官網標示日期**\n"
         f"{news.get('date', '-')}\n\n"
-        f"🔎 **機器人發現時間（台灣時間）**\n"
+        f"🔎 **{time_label}**\n"
         f"{format_discovered_at(news.get('discovered_at'))}\n\n"
         f"🏷️ **類別**\n"
         f"{news.get('category', '公告')}\n\n"

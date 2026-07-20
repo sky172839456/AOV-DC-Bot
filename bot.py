@@ -163,6 +163,7 @@ def main():
     discovered_at = datetime.now(TAIPEI)
     for news in new_news:
         news["discovered_at"] = discovered_at
+        news["is_test"] = test_mode
 
     fill_missing_images(new_news)
 
