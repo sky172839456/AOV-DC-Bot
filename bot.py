@@ -1,4 +1,6 @@
 import sys
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from config import (
     WEBHOOK_URL,
@@ -24,6 +26,9 @@ from core.logger import (
     save,
     done
 )
+
+
+TAIPEI = ZoneInfo("Asia/Taipei")
 
 
 def collect_new_news(news_list, latest_id, sent_ids=None, force_mode=False):
@@ -154,6 +159,11 @@ def main():
         return 0
 
     info(f"共有 {len(new_news)} 則新公告")
+
+    discovered_at = datetime.now(TAIPEI)
+    for news in new_news:
+        news["discovered_at"] = discovered_at
+        news["is_test"] = test_mode
 
     fill_missing_images(new_news)
 
