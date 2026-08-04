@@ -19,7 +19,7 @@ class NewsCollectionTests(unittest.TestCase):
 
     def test_all_official_news_categories_have_independent_sources(self):
         labels = {name for name, _ in NEWS_SOURCES}
-        self.assertEqual(labels, {"全部", "活動", "系統", "賽事", "教學"})
+        self.assertEqual(labels, {"全部", "活動", "系統", "賽事"})
 
     def test_backdated_unseen_article_after_latest_boundary_is_not_missed(self):
         items = [self.item("5700", 0), self.item("5699", 1), self.item("5650", 2)]
@@ -34,6 +34,11 @@ class NewsCollectionTests(unittest.TestCase):
         items = [self.item("5700", 0), self.item("5400", 0)]
         result = collect_new_news(items, "5699", sent_ids={"5700"}, now=self.now)
         self.assertEqual(result, [])
+
+    def test_same_announcement_id_is_only_collected_once(self):
+        items = [self.item("5700", 0, "公告"), self.item("5700", 0, "活動")]
+        result = collect_new_news(items, "5699", sent_ids=set(), now=self.now)
+        self.assertEqual([item["id"] for item in result], ["5700"])
 
     def test_category_preview_covers_every_monitored_category(self):
         items = [self.item(index, index, category) for index, category in enumerate(MONITORED_CATEGORIES)]

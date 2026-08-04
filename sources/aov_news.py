@@ -22,13 +22,12 @@ BASE_URL = "https://moba.garena.tw"
 DEFAULT_MAX_PAGES = 8
 DEFAULT_BACKFILL_DAYS = 30
 DEFAULT_ID_BACKFILL_WINDOW = 200
-MONITORED_CATEGORIES = ("公告", "活動", "系統", "賽事", "教學")
+MONITORED_CATEGORIES = ("公告", "系統", "活動", "賽事")
 NEWS_SOURCES = (
     ("全部", AOV_NEWS_URL),
     ("活動", urljoin(AOV_NEWS_URL, "Activity")),
     ("系統", urljoin(AOV_NEWS_URL, "System")),
     ("賽事", urljoin(AOV_NEWS_URL, "Esports")),
-    ("教學", urljoin(AOV_NEWS_URL, "Course")),
 )
 
 
@@ -324,6 +323,9 @@ def fetch_latest_news():
             added_count = 0
 
             for news in page_news:
+                if news.get("category") not in MONITORED_CATEGORIES:
+                    continue
+
                 existing = news_by_id.get(news["id"])
                 if existing:
                     # 同一篇可能同時出現在公告與活動頁；只保留一筆，
