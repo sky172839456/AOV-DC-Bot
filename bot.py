@@ -1,5 +1,5 @@
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from config import (
@@ -7,7 +7,13 @@ from config import (
     TEST_WEBHOOK_URL
 )
 
-from sources.aov_news import (fetch_latest_news, fill_missing_images)
+from sources.aov_news import (
+    MONITORED_CATEGORIES,
+    fetch_latest_news,
+    fill_missing_images,
+    get_backfill_days,
+    get_id_backfill_window,
+)
 
 from core.storage import (
     load_latest_id,
@@ -31,7 +37,7 @@ from core.logger import (
 TAIPEI = ZoneInfo("Asia/Taipei")
 
 
-def collect_new_news(news_list, latest_id, sent_ids=None, force_mode=False):
+def collect_new_news(news_list, latest_id, sent_ids=None, force_mode=False, now=None):
     """
     回傳這次需要發送的公告。
     news_list 需由新到舊排序。
@@ -42,12 +48,34 @@ def collect_new_news(news_list, latest_id, sent_ids=None, force_mode=False):
 
     new_news = []
     seen_ids = set(sent_ids or ())
+    if latest_id:
+        seen_ids.add(str(latest_id))
+    cutoff = (now or datetime.now()) - timedelta(days=get_backfill_days())
+    numeric_ids = [
+        int(news["id"])
+        for news in news_list
+        if str(news.get("id", "")).isdigit()
+    ]
+    if str(latest_id or "").isdigit():
+        numeric_ids.append(int(latest_id))
+    minimum_recent_id = (
+        max(numeric_ids) - get_id_backfill_window()
+        if numeric_ids
+        else None
+    )
 
     for news in news_list:
-        if news["id"] == latest_id:
-            break
-
         if news["id"] in seen_ids:
+            continue
+
+        if news["datetime"] < cutoff:
+            continue
+
+        if (
+            minimum_recent_id is not None
+            and str(news["id"]).isdigit()
+            and int(news["id"]) < minimum_recent_id
+        ):
             continue
 
         seen_ids.add(news["id"])
@@ -60,7 +88,7 @@ def collect_category_samples(news_list):
     """挑選最新一則公告與活動，供測試頻道驗證分類抓取。"""
 
     samples = []
-    for category in ("公告", "活動"):
+    for category in MONITORED_CATEGORIES:
         sample = next(
             (news for news in news_list if category in news.get("category", "")),
             None
@@ -140,11 +168,13 @@ def main():
     if test_categories_mode:
         new_news = collect_category_samples(news_list)
         found_categories = {news.get("category") for news in new_news}
-        if len(new_news) != 2:
-            warning(f"分類測試失敗，無法同時找到公告與活動：{found_categories}")
+        expected_categories = set(MONITORED_CATEGORIES)
+        if found_categories != expected_categories:
+            missing = expected_categories - found_categories
+            warning(f"分類測試失敗，缺少分類：{sorted(missing)}")
             done("Finished")
             return 1
-        info("分類測試：將發送最新公告與最新活動各一則")
+        info("分類測試：將發送每個監控分類的最新文章各一則")
     else:
         new_news = collect_new_news(
             news_list,
