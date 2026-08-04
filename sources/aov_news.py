@@ -1,6 +1,6 @@
 import os
 from datetime import datetime, timedelta
-from urllib.parse import urljoin
+from urllib.parse import quote, urljoin
 
 import requests
 from bs4 import BeautifulSoup
@@ -104,7 +104,7 @@ def normalize_image_url(image_src):
     if not image_src:
         return None
 
-    image = urljoin(BASE_URL, image_src)
+    image = quote(urljoin(BASE_URL, image_src), safe=":/?#[]@!$&'()*+,;=%")
 
     if not image.startswith("http"):
         return None
@@ -161,7 +161,7 @@ def parse_detail_image(html: str, page_url: str):
     if not image_src:
         return None
 
-    return urljoin(page_url, image_src)
+    return normalize_image_url(urljoin(page_url, image_src))
 
 
 def fetch_detail_image(news):

@@ -2,9 +2,27 @@ import unittest
 from datetime import datetime, timezone
 
 from embeds.embed_builder import build_embed
+from sources.aov_news import normalize_image_url, parse_detail_image
 
 
 class EmbedBuilderTests(unittest.TestCase):
+    def test_image_url_spaces_are_encoded_for_discord(self):
+        image = normalize_image_url(
+            "https://dlgarenanow-a.akamaihd.net/mgames/kgtw/Official website/2022/hot fix676.jpg"
+        )
+        self.assertEqual(
+            image,
+            "https://dlgarenanow-a.akamaihd.net/mgames/kgtw/Official%20website/2022/hot%20fix676.jpg",
+        )
+        self.assertNotIn(" ", image)
+
+    def test_detail_image_fallback_is_also_encoded(self):
+        image = parse_detail_image(
+            '<div class="news_content"><img src="/images/event banner.jpg"></div>',
+            "https://moba.garena.tw/news/show/1",
+        )
+        self.assertEqual(image, "https://moba.garena.tw/images/event%20banner.jpg")
+
     def test_shows_official_date_and_taipei_discovery_time(self):
         news = {
             "title": "測試公告",
