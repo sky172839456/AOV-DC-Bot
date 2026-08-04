@@ -20,9 +20,15 @@ HEADERS = {
 
 BASE_URL = "https://moba.garena.tw"
 DEFAULT_MAX_PAGES = 8
+DEFAULT_BACKFILL_DAYS = 30
+DEFAULT_ID_BACKFILL_WINDOW = 200
+MONITORED_CATEGORIES = ("公告", "活動", "系統", "賽事", "教學")
 NEWS_SOURCES = (
-    ("公告", AOV_NEWS_URL),
+    ("全部", AOV_NEWS_URL),
     ("活動", urljoin(AOV_NEWS_URL, "Activity")),
+    ("系統", urljoin(AOV_NEWS_URL, "System")),
+    ("賽事", urljoin(AOV_NEWS_URL, "Esports")),
+    ("教學", urljoin(AOV_NEWS_URL, "Course")),
 )
 
 
@@ -43,6 +49,35 @@ def get_max_pages():
         return DEFAULT_MAX_PAGES
 
     return max(1, max_pages)
+
+
+def get_backfill_days():
+    """官網延後刊登或回填日期時，仍回頭檢查近期未通知文章。"""
+    raw_value = os.getenv("AOV_BACKFILL_DAYS")
+    if not raw_value:
+        return DEFAULT_BACKFILL_DAYS
+    try:
+        days = int(raw_value)
+    except ValueError:
+        warning(f"AOV_BACKFILL_DAYS 不是有效數字，使用預設 {DEFAULT_BACKFILL_DAYS}")
+        return DEFAULT_BACKFILL_DAYS
+    return max(1, days)
+
+
+def get_id_backfill_window():
+    """Return how far behind the newest numeric article ID a catch-up may reach."""
+    raw_value = os.getenv("AOV_ID_BACKFILL_WINDOW")
+    if not raw_value:
+        return DEFAULT_ID_BACKFILL_WINDOW
+    try:
+        window = int(raw_value)
+    except ValueError:
+        warning(
+            "AOV_ID_BACKFILL_WINDOW 不是有效數字，"
+            f"使用預設 {DEFAULT_ID_BACKFILL_WINDOW}"
+        )
+        return DEFAULT_ID_BACKFILL_WINDOW
+    return max(1, window)
 
 
 def should_save_debug_html():
@@ -271,7 +306,7 @@ def fetch_latest_news():
             html = fetch_page(source_url, page)
             info(f"Garena {source_category}第 {page} 頁 HTML 長度：{len(html)}")
 
-            if source_category == "公告" and page == 1 and should_save_debug_html():
+            if source_category == "全部" and page == 1 and should_save_debug_html():
                 with open(
                     "garena.html",
                     "w",
@@ -279,7 +314,8 @@ def fetch_latest_news():
                 ) as f:
                     f.write(html)
 
-            page_news = parse_events(html, default_category=source_category)
+            default_category = "公告" if source_category == "全部" else source_category
+            page_news = parse_events(html, default_category=default_category)
 
             if not page_news:
                 warning(f"{source_category}第 {page} 頁沒有解析到內容，停止抓取")
@@ -292,8 +328,8 @@ def fetch_latest_news():
                 if existing:
                     # 同一篇可能同時出現在公告與活動頁；只保留一筆，
                     # 但只要活動頁有收錄，就以「活動」作為分類。
-                    if source_category == "活動":
-                        existing["category"] = "活動"
+                    if source_category in MONITORED_CATEGORIES:
+                        existing["category"] = source_category
                     continue
 
                 news_by_id[news["id"]] = news
