@@ -48,6 +48,20 @@ class EmbedBuilderTests(unittest.TestCase):
         self.assertNotIn("機器人發現時間（台灣時間）", description)
         self.assertIn("07/20 13:15", description)
 
+    def test_shows_detail_section_titles_before_link(self):
+        news = {
+            "title": "不停機更新公告",
+            "date": "08/27",
+            "category": "公告",
+            "url": "https://moba.garena.tw/news/show/1",
+            "sections": ["英雄平衡性調整", "BUG 修復"],
+        }
+        description = build_embed(news)["description"]
+        self.assertIn("本次更新重點", description)
+        self.assertIn("• 英雄平衡性調整", description)
+        self.assertIn("• BUG 修復", description)
+        self.assertLess(description.index("本次更新重點"), description.index("公告連結"))
+
 
 if __name__ == "__main__":
     unittest.main()

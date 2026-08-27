@@ -27,6 +27,13 @@ def build_embed(news):
 
     icon = get_embed_icon(news)
     time_label = "測試執行時間（台灣時間）" if news.get("is_test") else "機器人發現時間（台灣時間）"
+    sections = news.get("sections") or []
+    section_text = "\n".join(f"• {section}" for section in sections)
+    detail_block = (
+        f"📋 **本次更新重點**\n{section_text}\n\n"
+        if section_text
+        else ""
+    )
 
     description = (
         "━━━━━━━━━━━━━━━━━━━━━━\n\n"
@@ -37,6 +44,7 @@ def build_embed(news):
         f"{format_discovered_at(news.get('discovered_at'))}\n\n"
         f"🏷️ **類別**\n"
         f"{news.get('category', '公告')}\n\n"
+        f"{detail_block}"
         f"🔗 **公告連結：** <{news['url']}>\n"
         f"🌐 **官方網站：** <{OFFICIAL_SITE_URL}>\n"
         f"📘 **官方 FB：** <{OFFICIAL_FACEBOOK_URL}>\n\n"

@@ -22,6 +22,7 @@ BASE_URL = "https://moba.garena.tw"
 DEFAULT_MAX_PAGES = 8
 DEFAULT_BACKFILL_DAYS = 30
 DEFAULT_ID_BACKFILL_WINDOW = 200
+MAX_DETAIL_SECTIONS = 8
 MONITORED_CATEGORIES = ("公告", "系統", "活動", "賽事")
 NEWS_SOURCES = (
     ("全部", AOV_NEWS_URL),
@@ -198,18 +199,65 @@ def parse_detail_image(html: str, page_url: str):
     return normalize_image_url(urljoin(page_url, image_src))
 
 
-def fetch_detail_image(news):
+def parse_detail_sections(html: str):
+    """擷取公告內頁的紫色章節標題，例如英雄調整、BUG 修復。"""
+
+    soup = BeautifulSoup(html, "lxml")
+    content = soup.select_one("#news_content")
+
+    if not content:
+        return []
+
+    sections = []
+
+    for tag in content.select("h2, h3, h4, p"):
+        style_parts = [tag.get("style", "")]
+        style_parts.extend(
+            child.get("style", "")
+            for child in tag.find_all(["span", "strong"])
+        )
+        style = "".join(style_parts).lower().replace(" ", "")
+        is_purple = any(
+            color in style
+            for color in ("rgb(153,102,255)", "#9966ff")
+        )
+        is_heading = tag.name in {"h2", "h3", "h4"}
+
+        if not (is_purple or is_heading):
+            continue
+
+        title = " ".join(tag.get_text(" ", strip=True).split())
+
+        if not title or len(title) > 60 or title in sections:
+            continue
+
+        sections.append(title)
+
+        if len(sections) >= MAX_DETAIL_SECTIONS:
+            break
+
+    return sections
+
+
+def parse_detail(html: str, page_url: str):
+    return {
+        "image": parse_detail_image(html, page_url),
+        "sections": parse_detail_sections(html),
+    }
+
+
+def fetch_detail(news):
     """
-    列表沒有圖片時，進公告內頁補抓圖片。
+    進公告內頁補抓圖片與更新章節標題。
     """
 
     try:
-        fetch(f"抓取公告圖片：{news['id']}")
+        fetch(f"抓取公告內容：{news['id']}")
         html = fetch_url(news["url"])
-        return parse_detail_image(html, news["url"])
+        return parse_detail(html, news["url"])
     except requests.RequestException as exc:
-        warning(f"公告圖片抓取失敗：{news['id']} → {exc}")
-        return None
+        warning(f"公告內容抓取失敗：{news['id']} → {exc}")
+        return {"image": None, "sections": []}
 
 
 def parse_events(html: str, default_category="公告"):
@@ -280,10 +328,12 @@ def parse_events(html: str, default_category="公告"):
 
 def fill_missing_images(news_list):
     for news in news_list:
-        if news.get("image"):
-            continue
+        detail = fetch_detail(news)
 
-        news["image"] = fetch_detail_image(news)
+        if not news.get("image"):
+            news["image"] = detail.get("image")
+
+        news["sections"] = detail.get("sections", [])
 
     return news_list
 
